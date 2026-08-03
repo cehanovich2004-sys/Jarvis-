@@ -29,6 +29,5 @@ export function toJarvisError(error: unknown): JarvisError {
     return error;
   }
 
-  return new JarvisError("INVALID_PAYLOAD", 500, "Unexpected Jarvis Core error.");
+  return new JarvisError("INTERNAL_ERROR", 500, "Unexpected Jarvis Core error.");
 }
-

@@ -104,7 +104,7 @@ async function routeRequest(
       throw new JarvisError("COMMAND_NOT_FOUND", 404, "Command id was not provided.");
     }
 
-    const id = decodeURIComponent(rawId);
+    const id = decodeCommandId(rawId);
     assertCommandId(id);
     const command = await core.getCommand(id);
     const body: CommandResponse = { command };
@@ -113,6 +113,16 @@ async function routeRequest(
   }
 
   throw new JarvisError("ROUTE_NOT_FOUND", 404, "Route was not found.");
+}
+
+function decodeCommandId(rawId: string): string {
+  try {
+    return decodeURIComponent(rawId);
+  } catch {
+    throw new JarvisError("INVALID_PAYLOAD", 400, "Command id must be valid URL encoding.", {
+      field: "id"
+    });
+  }
 }
 
 async function readJson(request: IncomingMessage): Promise<unknown> {

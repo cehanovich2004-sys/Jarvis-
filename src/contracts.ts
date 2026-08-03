@@ -39,6 +39,7 @@ export type ErrorCode =
   | "COMMAND_NOT_SUPPORTED"
   | "COMMAND_ID_CONFLICT"
   | "COMMAND_NOT_FOUND"
+  | "INTERNAL_ERROR"
   | "METHOD_NOT_ALLOWED"
   | "ROUTE_NOT_FOUND";
 
@@ -49,4 +50,3 @@ export interface ErrorResponse {
     details?: unknown;
   };
 }
-

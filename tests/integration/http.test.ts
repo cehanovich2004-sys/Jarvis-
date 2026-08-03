@@ -102,3 +102,17 @@ test("http API rejects duplicate command id", async () => {
     await new Promise<void>((resolve) => started.server.close(() => resolve()));
   }
 });
+
+test("http API rejects malformed URL-encoded command id", async () => {
+  const started = await startJarvisServer({ port: 0 });
+
+  try {
+    const response = await fetch(`http://${started.host}:${started.port}/v1/commands/%E0%A4%A`);
+
+    assert.equal(response.status, 400);
+    const body = await jsonBody<ErrorResponse>(response);
+    assert.equal(body.error.code, "INVALID_PAYLOAD");
+  } finally {
+    await new Promise<void>((resolve) => started.server.close(() => resolve()));
+  }
+});
