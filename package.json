@@ -1,0 +1,30 @@
+{
+  "name": "jarvis-core",
+  "version": "0.1.0",
+  "description": "Local loopback-only JARVIS core vertical slice.",
+  "type": "module",
+  "private": true,
+  "packageManager": "pnpm@11.9.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "bin": {
+    "jarvis": "dist/src/cli.js",
+    "jarvis-core": "dist/src/server.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/link-local-bin.mjs",
+    "build": "tsc -p tsconfig.json && node scripts/link-local-bin.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "format:check": "node scripts/check-format.mjs",
+    "lint": "node scripts/lint.mjs",
+    "test": "pnpm build && node --test dist/tests/unit/*.test.js",
+    "test:integration": "pnpm build && node --test dist/tests/integration/*.test.js",
+    "jarvis": "node dist/src/cli.js",
+    "start": "node dist/src/server.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.9.0"
+  }
+}
