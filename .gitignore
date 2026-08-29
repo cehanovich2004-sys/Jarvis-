@@ -6,4 +6,6 @@ coverage/
 .env.*
 !.env.example
 .DS_Store
-
+recordings/
+audio-captures/
+voice-profiles/
