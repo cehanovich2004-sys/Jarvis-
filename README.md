@@ -13,6 +13,7 @@ It provides:
 - In-memory command storage
 - Loopback-only server binding
 - Local-first speech-to-text contracts with an optional `whisper.cpp` loopback runtime
+- Deterministic intent routing and an explicit safe macOS tool allowlist
 
 ## Requirements
 
@@ -87,3 +88,6 @@ curl http://127.0.0.1:3147/v1/commands/<command-id>
   uses a deterministic fake runtime and downloads no model.
 
 See [Local Speech-To-Text Runtime](docs/stt.md) for the J4 runtime boundary and configuration.
+
+See [Fast Intent And Safe macOS Tools](docs/intent-tools.md) for the J5 allowlist and execution
+boundary.
