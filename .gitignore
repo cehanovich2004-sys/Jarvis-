@@ -9,3 +9,6 @@ coverage/
 recordings/
 audio-captures/
 voice-profiles/
+stt-models/
+*.ggml
+*.gguf

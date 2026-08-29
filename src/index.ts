@@ -7,3 +7,4 @@ export * from "./repository.js";
 export * from "./validation.js";
 export * from "./audio/index.js";
 export * from "./voiceid/index.js";
+export * from "./stt/index.js";
