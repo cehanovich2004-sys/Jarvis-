@@ -12,6 +12,7 @@ It provides:
 - Input validation and structured errors
 - In-memory command storage
 - Loopback-only server binding
+- Local-first speech-to-text contracts with an optional `whisper.cpp` loopback runtime
 
 ## Requirements
 
@@ -82,3 +83,7 @@ curl http://127.0.0.1:3147/v1/commands/<command-id>
 - Only `статус` and `помощь` are supported.
 - No iOS, macOS GUI, voice, App Intents, Apple Shortcuts, Codex SDK, external network access, or app-control integration exists in this increment.
 - The service is intentionally local-only.
+- STT model installation and the long-lived `whisper.cpp` server are explicit local runtime steps; CI
+  uses a deterministic fake runtime and downloads no model.
+
+See [Local Speech-To-Text Runtime](docs/stt.md) for the J4 runtime boundary and configuration.
