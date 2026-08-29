@@ -142,6 +142,18 @@ test("bounded buffer rejects byte and duration overflow without partial append",
   assert.equal(byDuration.sampleCount, 0);
 });
 
+test("bounded buffer accepts an input exactly at both configured limits", () => {
+  const buffer = new BoundedAudioBuffer({
+    maxDurationSeconds: 2 / 16_000,
+    maxBufferBytes: 2 * Float32Array.BYTES_PER_ELEMENT
+  });
+
+  buffer.append(chunk([0.25, -0.25]));
+
+  assert.equal(buffer.sampleCount, 2);
+  assert.equal(buffer.durationSeconds, 2 / 16_000);
+});
+
 test("recorded input supports deterministic microphone-free playback", async () => {
   const input = new RecordedAudioInput([chunk([0.125]), chunk([0.25])]);
   const observed: number[] = [];
@@ -212,6 +224,18 @@ test("audio session returns cancelled for an aborted request", async () => {
   assert.equal(input.closed, true);
 });
 
+test("audio session handles a signal aborted before startup", async () => {
+  const input = new NonCooperativeInput();
+  const controller = new AbortController();
+  controller.abort();
+  const session = new AudioSession(input, new SequenceVad([]), { timeoutMilliseconds: 1_000 });
+
+  const result = await session.run(controller.signal);
+
+  assert.deepEqual(result, { state: "CANCELLED", audio: null });
+  assert.equal(input.closed, true);
+});
+
 test("audio session maps microphone failures to a safe Jarvis error and closes input", async () => {
   const input = new TrackingInput([], new Error("device path and private details"));
   const session = new AudioSession(input, new SequenceVad([]), { timeoutMilliseconds: 1_000 });
@@ -253,6 +277,21 @@ test("audio session is single-use", async () => {
     session.run(),
     (error: unknown) => error instanceof JarvisError && error.code === "AUDIO_INVALID"
   );
+});
+
+test("audio session rejects a concurrent second run", async () => {
+  const input = new HangingInput();
+  const controller = new AbortController();
+  const session = new AudioSession(input, new SequenceVad([]), { timeoutMilliseconds: 1_000 });
+  const firstRun = session.run(controller.signal);
+
+  await assert.rejects(
+    session.run(),
+    (error: unknown) => error instanceof JarvisError && error.code === "AUDIO_INVALID"
+  );
+  controller.abort();
+  assert.deepEqual(await firstRun, { state: "CANCELLED", audio: null });
+  assert.equal(input.closed, true);
 });
 
 test("audio session sanitizes resource cleanup failures", async () => {
