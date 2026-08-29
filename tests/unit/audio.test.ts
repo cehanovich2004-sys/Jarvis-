@@ -97,6 +97,20 @@ class NonCooperativeInput implements MicrophoneInput {
   }
 }
 
+class TouchTrackingInput implements MicrophoneInput {
+  chunksCalled = false;
+  closed = false;
+
+  chunks(): AsyncIterable<AudioChunk> {
+    this.chunksCalled = true;
+    throw new Error("chunks must not start after cancellation");
+  }
+
+  async close(): Promise<void> {
+    this.closed = true;
+  }
+}
+
 class HangingVad implements VoiceActivityDetector {
   async process(): Promise<VoiceActivity> {
     return await new Promise<VoiceActivity>(() => undefined);
@@ -166,6 +180,19 @@ test("recorded input supports deterministic microphone-free playback", async () 
   assert.deepEqual(observed, [0.125, 0.25]);
 });
 
+test("recorded input snapshots mutable source samples", async () => {
+  const source = new Float32Array([0.25]);
+  const input = new RecordedAudioInput([chunk(source)]);
+  source[0] = 0.75;
+  const observed: number[] = [];
+
+  for await (const item of input.chunks()) {
+    observed.push(item.samples[0] ?? 0);
+  }
+
+  assert.deepEqual(observed, [0.25]);
+});
+
 test("audio session completes on a valid VAD lifecycle and releases resources", async () => {
   const input = new TrackingInput([chunk([0]), chunk([0.5]), chunk([0.25])]);
   const vad = new SequenceVad(["SILENCE", "SPEECH_START", "SPEECH_END"]);
@@ -225,7 +252,7 @@ test("audio session returns cancelled for an aborted request", async () => {
 });
 
 test("audio session handles a signal aborted before startup", async () => {
-  const input = new NonCooperativeInput();
+  const input = new TouchTrackingInput();
   const controller = new AbortController();
   controller.abort();
   const session = new AudioSession(input, new SequenceVad([]), { timeoutMilliseconds: 1_000 });
@@ -233,6 +260,7 @@ test("audio session handles a signal aborted before startup", async () => {
   const result = await session.run(controller.signal);
 
   assert.deepEqual(result, { state: "CANCELLED", audio: null });
+  assert.equal(input.chunksCalled, false);
   assert.equal(input.closed, true);
 });
 
@@ -315,6 +343,31 @@ test("audio session sanitizes resource cleanup failures", async () => {
       error.code === "AUDIO_INPUT_FAILURE" &&
       error.message === "Audio resource cleanup failed." &&
       !error.message.includes("private device")
+  );
+  assert.equal(session.state, "ERROR");
+});
+
+test("audio session bounds non-cooperative resource cleanup", async () => {
+  const input: MicrophoneInput = {
+    async *chunks(): AsyncIterable<AudioChunk> {
+      yield chunk([0.5]);
+      yield chunk([0.25]);
+    },
+    async close(): Promise<void> {
+      await new Promise<void>(() => undefined);
+    }
+  };
+  const session = new AudioSession(input, new SequenceVad(["SPEECH_START", "SPEECH_END"]), {
+    timeoutMilliseconds: 1_000,
+    cleanupTimeoutMilliseconds: 5
+  });
+
+  await assert.rejects(
+    session.run(),
+    (error: unknown) =>
+      error instanceof JarvisError &&
+      error.code === "AUDIO_INPUT_FAILURE" &&
+      error.message === "Audio resource cleanup failed."
   );
   assert.equal(session.state, "ERROR");
 });

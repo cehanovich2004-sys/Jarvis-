@@ -12,8 +12,11 @@ import { DEFAULT_AUDIO_LIMITS } from "./validation.js";
 
 export interface AudioSessionOptions {
   readonly timeoutMilliseconds: number;
+  readonly cleanupTimeoutMilliseconds?: number;
   readonly limits?: AudioLimits;
 }
+
+const DEFAULT_CLEANUP_TIMEOUT_MILLISECONDS = 1_000;
 
 export class AudioSession {
   readonly #input: MicrophoneInput;
@@ -23,7 +26,11 @@ export class AudioSession {
   #hasRun = false;
 
   constructor(input: MicrophoneInput, vad: VoiceActivityDetector, options: AudioSessionOptions) {
-    if (!Number.isSafeInteger(options.timeoutMilliseconds) || options.timeoutMilliseconds <= 0) {
+    if (
+      !isValidTimeout(options.timeoutMilliseconds) ||
+      (options.cleanupTimeoutMilliseconds !== undefined &&
+        !isValidTimeout(options.cleanupTimeoutMilliseconds))
+    ) {
       throw new JarvisError("AUDIO_INVALID", 422, "Audio session timeout is invalid.");
     }
     this.#input = input;
@@ -52,6 +59,9 @@ export class AudioSession {
 
     try {
       this.#vad.reset();
+      if (controller.signal.aborted) {
+        return this.#incompleteResult(signal?.aborted === true ? "CANCELLED" : "TIMEOUT");
+      }
       const iterator = this.#input.chunks(controller.signal)[Symbol.asyncIterator]();
 
       while (true) {
@@ -66,7 +76,10 @@ export class AudioSession {
           break;
         }
 
-        const activityResult = await withAbort(this.#vad.process(next.result.value), controller.signal);
+        const activityResult = await withAbort(
+          () => this.#vad.process(next.result.value),
+          controller.signal
+        );
         if (activityResult.kind === "aborted") {
           return this.#incompleteResult(signal?.aborted === true ? "CANCELLED" : "TIMEOUT");
         }
@@ -104,7 +117,13 @@ export class AudioSession {
         cleanupFailed = true;
       }
       try {
-        await this.#input.close();
+        const closeResult = await withTimeout(
+          () => this.#input.close(),
+          this.#options.cleanupTimeoutMilliseconds ?? DEFAULT_CLEANUP_TIMEOUT_MILLISECONDS
+        );
+        if (closeResult.kind !== "value") {
+          cleanupFailed = true;
+        }
       } catch {
         cleanupFailed = true;
       }
@@ -148,7 +167,7 @@ async function nextChunk(
   iterator: AsyncIterator<import("./contracts.js").AudioChunk>,
   signal: AbortSignal
 ): Promise<NextChunkResult> {
-  const result = await withAbort(iterator.next(), signal);
+  const result = await withAbort(() => iterator.next(), signal);
   if (result.kind === "value") {
     return { kind: "next", result: result.value };
   }
@@ -160,7 +179,10 @@ type AbortableResult<T> =
   | { readonly kind: "error"; readonly error: unknown }
   | { readonly kind: "aborted" };
 
-async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise<AbortableResult<T>> {
+async function withAbort<T>(
+  operation: () => Promise<T>,
+  signal: AbortSignal
+): Promise<AbortableResult<T>> {
   if (signal.aborted) {
     return { kind: "aborted" };
   }
@@ -170,7 +192,16 @@ async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise
     onAbort = () => resolve({ kind: "aborted" });
     signal.addEventListener("abort", onAbort, { once: true });
   });
-  const settled = operation.then<AbortableResult<T>, AbortableResult<T>>(
+  let promise: Promise<T>;
+  try {
+    promise = operation();
+  } catch (error) {
+    if (onAbort !== undefined) {
+      signal.removeEventListener("abort", onAbort);
+    }
+    return { kind: "error", error };
+  }
+  const settled = promise.then<AbortableResult<T>, AbortableResult<T>>(
     (value) => ({ kind: "value", value }),
     (error: unknown) => ({ kind: "error", error })
   );
@@ -182,4 +213,21 @@ async function withAbort<T>(operation: Promise<T>, signal: AbortSignal): Promise
       signal.removeEventListener("abort", onAbort);
     }
   }
+}
+
+async function withTimeout<T>(
+  operation: () => Promise<T>,
+  timeoutMilliseconds: number
+): Promise<AbortableResult<T>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMilliseconds);
+  try {
+    return await withAbort(operation, controller.signal);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+function isValidTimeout(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0;
 }
