@@ -10,3 +10,4 @@ export * from "./voiceid/index.js";
 export * from "./stt/index.js";
 export * from "./intents/index.js";
 export * from "./tools/index.js";
+export * from "./tts/index.js";

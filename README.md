@@ -14,6 +14,7 @@ It provides:
 - Loopback-only server binding
 - Local-first speech-to-text contracts with an optional `whisper.cpp` loopback runtime
 - Deterministic intent routing and an explicit safe macOS tool allowlist
+- Cancellable local text-to-speech through the native macOS speech process
 
 ## Requirements
 
@@ -91,3 +92,6 @@ See [Local Speech-To-Text Runtime](docs/stt.md) for the J4 runtime boundary and 
 
 See [Fast Intent And Safe macOS Tools](docs/intent-tools.md) for the J5 allowlist and execution
 boundary.
+
+See [Local Text-To-Speech](docs/tts.md) for the J6 playback contract, configuration, and cancellation
+lifecycle.
