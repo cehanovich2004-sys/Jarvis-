@@ -246,22 +246,52 @@ async function runBounded<T>(
     throw new OperationCancelledError();
   }
   const controller = new AbortController();
+  let terminalReason: "TIMEOUT" | "CANCELLED" | undefined;
   let timeout: ReturnType<typeof setTimeout> | undefined;
   let onAbort: (() => void) | undefined;
   const timeoutResult = new Promise<never>((_resolve, reject) => {
     timeout = setTimeout(() => {
+      if (terminalReason !== undefined) {
+        return;
+      }
+      terminalReason = "TIMEOUT";
       controller.abort();
       reject(new OperationTimeoutError());
     }, timeoutMilliseconds);
   });
   const cancellationResult = new Promise<never>((_resolve, reject) => {
     onAbort = () => {
+      if (terminalReason !== undefined) {
+        return;
+      }
+      terminalReason = "CANCELLED";
       controller.abort();
       reject(new OperationCancelledError());
     };
     externalSignal?.addEventListener("abort", onAbort, { once: true });
   });
-  const operationResult = Promise.resolve().then(() => operation(controller.signal));
+  const operationResult = Promise.resolve()
+    .then(() => operation(controller.signal))
+    .then(
+      (result) => {
+        if (terminalReason === "CANCELLED") {
+          throw new OperationCancelledError();
+        }
+        if (terminalReason === "TIMEOUT") {
+          throw new OperationTimeoutError();
+        }
+        return result;
+      },
+      (error: unknown) => {
+        if (terminalReason === "CANCELLED") {
+          throw new OperationCancelledError();
+        }
+        if (terminalReason === "TIMEOUT") {
+          throw new OperationTimeoutError();
+        }
+        throw error;
+      }
+    );
   try {
     return await Promise.race([operationResult, timeoutResult, cancellationResult]);
   } finally {

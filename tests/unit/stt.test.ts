@@ -299,12 +299,12 @@ test("local factory wires config to the whisper.cpp runtime without native depen
   });
 });
 
-test("whisper.cpp runtime posts in-memory WAV to loopback and parses verbose JSON", async () => {
-  let requestBody: FormData | undefined;
+test("whisper.cpp runtime requests transcription semantics for AUTO, RU, and EN", async () => {
+  const requestBodies: FormData[] = [];
   const fetch: typeof globalThis.fetch = async (_input, init) => {
     assert.equal(init?.method, "POST");
     assert.ok(init?.body instanceof FormData);
-    requestBody = init.body;
+    requestBodies.push(init.body);
     return new Response(
       JSON.stringify({
         text: " Джарвис, открой Safari. ",
@@ -320,26 +320,83 @@ test("whisper.cpp runtime posts in-memory WAV to loopback and parses verbose JSO
     backendVersion: "1.9.1",
     fetch
   });
-  const result = await runtime.transcribe({
-    waveform: audio().samples,
-    sampleRateHz: 16_000,
-    channels: 1,
-    format: "pcm-f32",
-    languageMode: "AUTO"
-  });
+  const transcribe = (languageMode: "AUTO" | "RU" | "EN") =>
+    runtime.transcribe({
+      waveform: audio().samples,
+      sampleRateHz: 16_000,
+      channels: 1,
+      format: "pcm-f32",
+      languageMode
+    });
+  const result = await transcribe("AUTO");
+  await transcribe("RU");
+  await transcribe("EN");
   assert.deepEqual(result, {
     status: "SUCCESS",
     text: " Джарвис, открой Safari. ",
     language: "ru",
     languageConfidence: 0.94
   });
-  assert.equal(requestBody?.get("language"), "auto");
-  assert.equal(requestBody?.get("detect_language"), "true");
-  const file = requestBody?.get("file");
+  assert.deepEqual(
+    requestBodies.map((body) => body.get("language")),
+    ["auto", "ru", "en"]
+  );
+  for (const body of requestBodies) {
+    assert.equal(body.get("detect_language"), null);
+  }
+  const file = requestBodies[0]?.get("file");
   assert.ok(file instanceof Blob);
   const wav = new Uint8Array(await file.arrayBuffer());
   assert.equal(new TextDecoder().decode(wav.subarray(0, 4)), "RIFF");
   assert.equal(new DataView(wav.buffer).getUint32(24, true), 16_000);
+});
+
+test("real whisper.cpp boundary preserves cancellation, timeout, and connection failures", async () => {
+  const abortAwareFetch: typeof globalThis.fetch = async (_input, init) =>
+    new Promise<Response>((_resolve, reject) => {
+      const signal = init?.signal;
+      if (signal?.aborted === true) {
+        reject(new DOMException("aborted", "AbortError"));
+        return;
+      }
+      signal?.addEventListener(
+        "abort",
+        () => reject(new DOMException("aborted", "AbortError")),
+        { once: true }
+      );
+    });
+  const runtime = new WhisperCppRuntimeClient({
+    endpoint: "http://127.0.0.1:8080/inference",
+    model: "base",
+    fetch: abortAwareFetch
+  });
+
+  const externalController = new AbortController();
+  const externallyCancelled = new SpeechToTextService(
+    new SpeechToTextAdapter(runtime, { timeoutMilliseconds: 1_000 })
+  ).transcribe(audio(), { signal: externalController.signal });
+  externalController.abort();
+  await assertJarvisCode(externallyCancelled, "STT_CANCELLED");
+
+  await assertJarvisCode(
+    new SpeechToTextService(
+      new SpeechToTextAdapter(runtime, { timeoutMilliseconds: 5 })
+    ).transcribe(audio()),
+    "STT_TIMEOUT"
+  );
+
+  const connectionFailure: typeof globalThis.fetch = async () => {
+    throw new TypeError("connection refused at /private/runtime");
+  };
+  const unavailableRuntime = new WhisperCppRuntimeClient({
+    endpoint: "http://127.0.0.1:8080/inference",
+    model: "base",
+    fetch: connectionFailure
+  });
+  await assertJarvisCode(
+    new SpeechToTextService(new SpeechToTextAdapter(unavailableRuntime)).transcribe(audio()),
+    "STT_MODEL_UNAVAILABLE"
+  );
 });
 
 test("whisper.cpp runtime rejects non-loopback endpoints and bounds responses", async () => {

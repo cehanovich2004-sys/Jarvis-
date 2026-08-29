@@ -37,7 +37,6 @@ export class WhisperCppRuntimeClient implements STTRuntimeClient {
     form.set("file", new Blob([encodePcm16Wav(input.waveform)], { type: "audio/wav" }), "audio.wav");
     form.set("response_format", "verbose_json");
     form.set("language", toWhisperLanguage(input.languageMode));
-    form.set("detect_language", input.languageMode === "AUTO" ? "true" : "false");
     form.set("token_timestamps", "false");
     form.set("no_context", "true");
 
@@ -48,7 +47,10 @@ export class WhisperCppRuntimeClient implements STTRuntimeClient {
         body: form,
         ...(signal === undefined ? {} : { signal })
       });
-    } catch {
+    } catch (error) {
+      if (signal?.aborted === true) {
+        throw error;
+      }
       return { status: "INVALID", errorCode: "MODEL_UNAVAILABLE" };
     }
     if (!response.ok) {
