@@ -49,7 +49,9 @@ export class LiveVoiceMode {
         ...(options.signal === undefined ? {} : { signal: options.signal }),
         ...(options.onStateChange === undefined
           ? {}
-          : { onStateChange: (state) => notify(options.onStateChange, state) })
+          : { onStateChange: (state) => notify(options.onStateChange, state) }),
+        ...(options.onTranscript === undefined ? {} : { onTranscript: options.onTranscript }),
+        ...(options.onIdentity === undefined ? {} : { onIdentity: options.onIdentity })
       });
       return resultForInteraction(interaction, audioDurationSeconds);
     } catch (error) {

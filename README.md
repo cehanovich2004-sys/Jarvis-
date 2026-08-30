@@ -22,7 +22,7 @@ It provides:
 - Deterministic barge-in coordination with cancellable playback and exclusive tool execution
 - Explicit privacy-controlled long-term memory with replaceable local persistence
 - Optional privacy-gated hybrid cloud escalation behind deterministic and local intelligence
-- Explicit-start one-shot live voice capture foundation for macOS
+- Explicit-start one-shot live voice mode with real local VoiceID and managed whisper.cpp runtimes
 
 ## Requirements
 

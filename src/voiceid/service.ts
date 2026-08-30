@@ -43,7 +43,8 @@ export class SpeakerRecognitionService {
 
   async enrollOwner(
     profileId: string,
-    audioSamples: readonly AudioData[]
+    audioSamples: readonly AudioData[],
+    signal?: AbortSignal
   ): Promise<OwnerSpeakerProfileSummary> {
     if (
       audioSamples.length < 2 ||
@@ -57,7 +58,8 @@ export class SpeakerRecognitionService {
     }
     const embeddings = [];
     for (const audio of audioSamples) {
-      embeddings.push(await this.#adapter.extractEmbedding(audio));
+      if (signal?.aborted === true) throw signal.reason;
+      embeddings.push(await this.#adapter.extractEmbedding(audio, signal));
     }
     const profile = buildOwnerSpeakerProfile(profileId, embeddings, this.#now().toISOString());
     try {
@@ -81,7 +83,11 @@ export class SpeakerRecognitionService {
     };
   }
 
-  async verifySpeaker(audio: AudioData, profileId: string): Promise<SpeakerVerificationResult> {
+  async verifySpeaker(
+    audio: AudioData,
+    profileId: string,
+    signal?: AbortSignal
+  ): Promise<SpeakerVerificationResult> {
     const startedAt = performance.now();
     let profile;
     try {
@@ -94,10 +100,11 @@ export class SpeakerRecognitionService {
     }
     validateProfile(profile);
 
-    const candidate = await this.#adapter.extractEmbedding(audio);
+    if (signal?.aborted === true) throw signal.reason;
+    const candidate = await this.#adapter.extractEmbedding(audio, signal);
     const similarities: number[] = [];
     for (const reference of profile.referenceEmbeddings) {
-      similarities.push(await this.#adapter.compare(reference, candidate));
+      similarities.push(await this.#adapter.compare(reference, candidate, signal));
     }
     let decision: SpeakerDecision;
     try {

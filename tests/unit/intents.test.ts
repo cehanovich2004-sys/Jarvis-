@@ -40,7 +40,12 @@ test("deterministically routes the explicit Russian, English, and mixed applicat
 
 test("routes the explicit battery queries", () => {
   const router = new DeterministicIntentRouter();
-  for (const text of ["Какой заряд батареи?", "Джарвис, заряд", "What's the battery level?"]) {
+  for (const text of [
+    "Какой заряд батареи?",
+    "Слушай, какой заряд батареи?",
+    "Джарвис, заряд",
+    "What's the battery level?"
+  ]) {
     assert.deepEqual(router.route(transcript(text)), {
       status: "MATCHED",
       command: { intent: "GET_BATTERY", parameters: {}, confidence: 1 }

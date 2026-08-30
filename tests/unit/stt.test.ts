@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
+import type { ChildProcess, spawn } from "node:child_process";
 import type { AudioData } from "../../src/audio/contracts.js";
 import { JarvisError } from "../../src/errors.js";
 import {
   SpeechToTextAdapter,
   SpeechToTextService,
   WhisperCppRuntimeClient,
+  WhisperServerProcess,
   createLocalSpeechToTextService,
   encodePcm16Wav,
   loadSTTConfig,
@@ -458,3 +464,61 @@ test("PCM16 WAV conversion is deterministic and safely clips boundaries", () => 
   assert.equal(view.getInt16(52, true), 32_767);
   assert.deepEqual(wav, encodePcm16Wav(new Float32Array([-1, -0.5, 0, 0.5, 1])));
 });
+
+test("managed whisper.cpp server is loopback-only, shell-free, ready, and cleaned up", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-whisper-"));
+  const model = join(directory, "ggml-base.bin");
+  await writeFile(model, Buffer.alloc(1_000_001));
+  const processState: { signalCode: NodeJS.Signals | null } = { signalCode: null };
+  const process = new EventEmitter() as ChildProcess & { killedSignals: NodeJS.Signals[] };
+  Object.defineProperty(process, "exitCode", { get: () => null });
+  Object.defineProperty(process, "signalCode", { get: () => processState.signalCode });
+  process.killedSignals = [];
+  process.kill = ((signal?: NodeJS.Signals | number) => {
+    process.killedSignals.push(signal as NodeJS.Signals);
+    processState.signalCode = signal as NodeJS.Signals;
+    process.emit("exit", null, signal);
+    return true;
+  }) as ChildProcess["kill"];
+  let observedArguments: readonly string[] = [];
+  let observedShell: boolean | undefined;
+  const spawnProcess = ((_executable: string, arguments_: readonly string[], options: { shell?: boolean }) => {
+    observedArguments = arguments_;
+    observedShell = options.shell;
+    return process;
+  }) as unknown as typeof spawn;
+  const server = new WhisperServerProcess({
+    executable: "/opt/homebrew/bin/whisper-server",
+    modelPath: model,
+    endpoint: "http://127.0.0.1:8080/inference",
+    spawnProcess,
+    fetch: async () => new Response("ok", { status: 200 })
+  });
+  try {
+    await server.start();
+    assert.equal(observedShell, false);
+    assert.deepEqual(observedArguments.slice(0, 4), ["--host", "127.0.0.1", "--port", "8080"]);
+    assert.equal(observedArguments.includes("--detect-language"), false);
+    await server.close();
+    assert.deepEqual(process.killedSignals, ["SIGTERM"]);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("managed whisper.cpp server rejects public endpoints and arbitrary executables", () => {
+  assert.throws(() => new WhisperServerProcess({
+    executable: "/tmp/whisper-server",
+    modelPath: "/tmp/ggml-base.bin",
+    endpoint: "http://127.0.0.1:8080/inference"
+  }), hasCode("STT_MODEL_UNAVAILABLE"));
+  assert.throws(() => new WhisperServerProcess({
+    executable: "/opt/homebrew/bin/whisper-server",
+    modelPath: "/tmp/ggml-base.bin",
+    endpoint: "http://localhost:8080/inference"
+  }), hasCode("STT_MODEL_UNAVAILABLE"));
+});
+
+function hasCode(code: string): (error: unknown) => boolean {
+  return (error) => error instanceof JarvisError && error.code === code;
+}

@@ -23,6 +23,8 @@
     "test:integration": "pnpm build && node --test dist/tests/integration/*.test.js",
     "jarvis": "node dist/src/cli.js",
     "jarvis:voice": "pnpm build && node dist/src/live-voice/cli.js",
+    "jarvis:voice:enroll": "pnpm build && node dist/src/live-voice/enroll-cli.js",
+    "jarvis:voice:import-voiceid": "pnpm build && node dist/src/live-voice/import-voiceid-cli.js",
     "start": "node dist/src/server.js"
   },
   "devDependencies": {

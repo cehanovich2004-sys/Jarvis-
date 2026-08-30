@@ -1,12 +1,18 @@
 import assert from "node:assert/strict";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { test } from "node:test";
 import type { AudioData } from "../../src/audio/contracts.js";
 import { JarvisError } from "../../src/errors.js";
 import {
   InMemoryOwnerSpeakerProfileRepository,
+  JsonOwnerSpeakerProfileRepository,
+  PythonVoiceIDRuntimeClient,
   SpeakerRecognitionService,
   ThresholdDecisionPolicy,
   VoiceIDAdapter,
+  loadDevelopmentDecisionPolicy,
   VOICEID_BACKEND_NAME,
   VOICEID_BACKEND_VERSION,
   VOICEID_COMPARISON_VERSION,
@@ -452,3 +458,94 @@ test("service rejects a contradictory decision policy result", async () => {
     "SPEAKER_VERIFICATION_FAILURE"
   );
 });
+
+test("development policy is explicit, configurable, and never presented as calibrated", () => {
+  assert.throws(() => loadDevelopmentDecisionPolicy({}), hasCode("SPEAKER_VERIFICATION_FAILURE"));
+  const policy = loadDevelopmentDecisionPolicy({
+    JARVIS_VOICEID_POLICY_MODE: "DEVELOPMENT_ONLY",
+    JARVIS_VOICEID_DEV_AUTHORIZED_THRESHOLD: "0.8",
+    JARVIS_VOICEID_DEV_UNAUTHORIZED_THRESHOLD: "0.5"
+  });
+  assert.equal(policy.policyId, "development-only-explicit-v1");
+  assert.equal(policy.calibrationRequired, true);
+  assert.equal(policy.decide([0.9]).status, "AUTHORIZED");
+  assert.equal(policy.decide([0.6]).status, "UNCERTAIN");
+  assert.equal(policy.decide([0.2]).status, "UNAUTHORIZED");
+});
+
+test("JSON owner profile store is private, atomic, defensive, and deletable", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-profile-"));
+  await chmod(directory, 0o700);
+  const path = join(directory, "owner.json");
+  const repository = new JsonOwnerSpeakerProfileRepository(path);
+  const profile: OwnerSpeakerProfile = {
+    profileId: "owner-main",
+    createdAt: CREATED_AT,
+    referenceEmbeddings: [embedding(1), embedding(2)]
+  };
+  try {
+    await repository.put(profile);
+    assert.equal((await stat(path)).mode & 0o077, 0);
+    const restored = await repository.get("owner-main");
+    assert.deepEqual(restored?.referenceEmbeddings.map((item) => [...item.values]), [[1, ...new Array(191).fill(0)], [2, ...new Array(191).fill(0)]]);
+    restored?.referenceEmbeddings[0]?.values.fill(9);
+    assert.equal((await repository.get("owner-main"))?.referenceEmbeddings[0]?.values[0], 1);
+    assert.equal(await repository.delete("owner-main"), true);
+    assert.equal(await repository.get("owner-main"), undefined);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("JSON owner profile store rejects public permissions and unknown fields", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-profile-"));
+  await chmod(directory, 0o700);
+  const path = join(directory, "owner.json");
+  const repository = new JsonOwnerSpeakerProfileRepository(path);
+  try {
+    await repository.put({
+      profileId: "owner-main",
+      createdAt: CREATED_AT,
+      referenceEmbeddings: [embedding(1), embedding(2)]
+    });
+    await chmod(path, 0o644);
+    await assertRejectsCode(repository.get("owner-main"), "SPEAKER_PROFILE_INCOMPATIBLE");
+    await chmod(path, 0o600);
+    const parsed = JSON.parse(await readFile(path, "utf8")) as Record<string, unknown>;
+    parsed.secret = "not accepted";
+    await writeFile(path, JSON.stringify(parsed), { mode: 0o600 });
+    await assertRejectsCode(repository.get("owner-main"), "SPEAKER_PROFILE_INCOMPATIBLE");
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Python VoiceID runtime terminates its process on cancellation", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-voiceid-runtime-"));
+  const script = join(directory, "bridge.py");
+  await writeFile(script, "import sys,time\nfor line in sys.stdin:\n time.sleep(30)\n", { mode: 0o700 });
+  const runtime = new PythonVoiceIDRuntimeClient({
+    pythonExecutable: "/usr/bin/python3",
+    bridgeScript: script,
+    voiceIdSourceDirectory: directory,
+    modelCacheDirectory: directory
+  });
+  const controller = new AbortController();
+  try {
+    const pending = runtime.extractEmbedding({
+      waveform: new Float32Array([0.1]),
+      sampleRateHz: 16_000,
+      channels: 1,
+      format: "pcm-f32"
+    }, controller.signal);
+    controller.abort(new Error("cancelled"));
+    await assert.rejects(pending);
+  } finally {
+    await runtime.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+function hasCode(code: string): (error: unknown) => boolean {
+  return (error) => error instanceof JarvisError && error.code === code;
+}

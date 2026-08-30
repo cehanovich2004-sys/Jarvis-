@@ -11,6 +11,7 @@ const PROFILE_ID_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{2,63}$/;
 export interface OwnerSpeakerProfileRepository {
   get(profileId: string): Promise<OwnerSpeakerProfile | undefined>;
   put(profile: OwnerSpeakerProfile): Promise<void>;
+  delete?(profileId: string): Promise<boolean>;
 }
 
 export class InMemoryOwnerSpeakerProfileRepository implements OwnerSpeakerProfileRepository {
@@ -24,6 +25,10 @@ export class InMemoryOwnerSpeakerProfileRepository implements OwnerSpeakerProfil
   async put(profile: OwnerSpeakerProfile): Promise<void> {
     validateProfile(profile);
     this.#profiles.set(profile.profileId, copyProfile(profile));
+  }
+
+  async delete(profileId: string): Promise<boolean> {
+    return this.#profiles.delete(profileId);
   }
 }
 

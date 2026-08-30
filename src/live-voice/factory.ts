@@ -24,6 +24,7 @@ import {
   ToolRegistry
 } from "../tools/index.js";
 import { createLocalTextToSpeechService } from "../tts/index.js";
+import { createRealVoiceIDComponents, type RealVoiceIDComponents } from "../voiceid/index.js";
 import { loadLiveVoiceConfiguration } from "./config.js";
 import { LiveVoiceMode } from "./service.js";
 
@@ -31,6 +32,20 @@ export interface MacOSLiveVoiceFactoryOptions {
   readonly speakerRecognition: SpeakerVerificationPort;
   readonly environment?: NodeJS.ProcessEnv;
   readonly microphoneRunner?: MicrophoneProcessRunner;
+}
+
+export interface RealMacOSLiveVoiceMode {
+  readonly mode: LiveVoiceMode;
+  readonly voiceId: RealVoiceIDComponents;
+  close(): Promise<void>;
+}
+
+export function createRealMacOSLiveVoiceMode(
+  environment: NodeJS.ProcessEnv = process.env
+): RealMacOSLiveVoiceMode {
+  const voiceId = createRealVoiceIDComponents(environment);
+  const mode = createMacOSLiveVoiceMode({ speakerRecognition: voiceId.service, environment });
+  return { mode, voiceId, close: () => voiceId.close() };
 }
 
 export function createMacOSLiveVoiceMode(options: MacOSLiveVoiceFactoryOptions): LiveVoiceMode {
