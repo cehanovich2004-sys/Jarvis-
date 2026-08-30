@@ -65,4 +65,3 @@ export class VoiceInteractionStateMachine {
     this.transition(state);
   }
 }
-
