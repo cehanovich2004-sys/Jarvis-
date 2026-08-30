@@ -21,6 +21,7 @@ It provides:
 - Deterministic presentation-only response personality with bounded humor
 - Deterministic barge-in coordination with cancellable playback and exclusive tool execution
 - Explicit privacy-controlled long-term memory with replaceable local persistence
+- Optional privacy-gated hybrid cloud escalation behind deterministic and local intelligence
 
 ## Requirements
 
@@ -115,3 +116,5 @@ See [Personality And Response Style](docs/personality.md) for J10 tone, humor, a
 See [Barge-In And Interruption](docs/barge-in.md) for J11 ownership, handoff, and race guarantees.
 
 See [Long-Term Memory](docs/long-term-memory.md) for J12 consent, privacy, retention, and persistence.
+
+See [Hybrid Intelligence](docs/hybrid-intelligence.md) for J13 modes, escalation, and cloud privacy.
