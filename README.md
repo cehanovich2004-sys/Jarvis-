@@ -22,6 +22,7 @@ It provides:
 - Deterministic barge-in coordination with cancellable playback and exclusive tool execution
 - Explicit privacy-controlled long-term memory with replaceable local persistence
 - Optional privacy-gated hybrid cloud escalation behind deterministic and local intelligence
+- Explicit-start one-shot live voice capture foundation for macOS
 
 ## Requirements
 
@@ -118,3 +119,5 @@ See [Barge-In And Interruption](docs/barge-in.md) for J11 ownership, handoff, an
 See [Long-Term Memory](docs/long-term-memory.md) for J12 consent, privacy, retention, and persistence.
 
 See [Hybrid Intelligence](docs/hybrid-intelligence.md) for J13 modes, escalation, and cloud privacy.
+
+See [Live Voice Mode Foundation](docs/live-voice.md) for JV1 capture, VAD, runtime setup, and current identity readiness.

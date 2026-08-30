@@ -44,6 +44,12 @@ const ALLOWED_TRANSITIONS: Readonly<Record<VoiceInteractionState, readonly Voice
 export class VoiceInteractionStateMachine {
   #state: VoiceInteractionState = "START";
   readonly #transitions: VoiceInteractionState[] = ["START"];
+  readonly #observer: ((state: VoiceInteractionState) => void) | undefined;
+
+  constructor(observer?: (state: VoiceInteractionState) => void) {
+    this.#observer = observer;
+    this.#notify("START");
+  }
 
   get state(): VoiceInteractionState {
     return this.#state;
@@ -59,6 +65,7 @@ export class VoiceInteractionStateMachine {
     }
     this.#state = next;
     this.#transitions.push(next);
+    this.#notify(next);
   }
 
   finish(state: VoiceInteractionTerminalState): void {
@@ -66,5 +73,13 @@ export class VoiceInteractionStateMachine {
       throw new Error("Voice interaction must finish in a terminal state.");
     }
     this.transition(state);
+  }
+
+  #notify(state: VoiceInteractionState): void {
+    try {
+      this.#observer?.(state);
+    } catch {
+      // State visibility is observational and cannot alter interaction semantics.
+    }
   }
 }
