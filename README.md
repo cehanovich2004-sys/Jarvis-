@@ -16,6 +16,7 @@ It provides:
 - Deterministic intent routing and an explicit safe macOS tool allowlist
 - Cancellable local text-to-speech through the native macOS speech process
 - Identity-gated deterministic voice interaction orchestration
+- Local-first structured intelligence fallback through a validated Ollama boundary
 
 ## Requirements
 
@@ -99,3 +100,5 @@ lifecycle.
 
 See [Voice Interaction Orchestration](docs/voice-loop.md) for the J7 state machine, identity gate,
 and cancellation behavior.
+
+See [Local LLM Foundation](docs/local-llm.md) for the J8 runtime, validation, and security boundary.
