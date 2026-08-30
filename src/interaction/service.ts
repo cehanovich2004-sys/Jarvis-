@@ -13,7 +13,9 @@ import {
   DeterministicResponseGenerator,
   type InteractionResponseGenerator
 } from "./responses.js";
+import { ExclusiveActionExecutor } from "./exclusive-executor.js";
 import { VoiceInteractionStateMachine } from "./state-machine.js";
+import { isInteractionInterruption } from "./interruption-reason.js";
 
 export class VoiceInteractionService {
   readonly #dependencies: VoiceInteractionDependencies;
@@ -23,7 +25,10 @@ export class VoiceInteractionService {
     dependencies: VoiceInteractionDependencies,
     responses: InteractionResponseGenerator = new DeterministicResponseGenerator()
   ) {
-    this.#dependencies = dependencies;
+    this.#dependencies = {
+      ...dependencies,
+      actionExecutor: new ExclusiveActionExecutor(dependencies.actionExecutor)
+    };
     this.#responses = responses;
   }
 
@@ -122,6 +127,16 @@ export class VoiceInteractionService {
         execution
       };
     } catch (error) {
+      if (isInteractionInterruption(signal?.reason) || isInteractionInterruption(error)) {
+        finishAfterFailure(machine, "INTERRUPTED");
+        return {
+          state: "INTERRUPTED",
+          transitions: machine.transitions,
+          responseText,
+          playback: null,
+          execution
+        };
+      }
       if (signal?.aborted === true || isCancellation(error)) {
         finishAfterFailure(machine, "CANCELLED");
         return {
@@ -206,7 +221,7 @@ function isCancellation(error: unknown): boolean {
 
 function finishAfterFailure(
   machine: VoiceInteractionStateMachine,
-  state: "CANCELLED" | "ERROR"
+  state: "INTERRUPTED" | "CANCELLED" | "ERROR"
 ): void {
   if (machine.state !== state) {
     machine.finish(state);
