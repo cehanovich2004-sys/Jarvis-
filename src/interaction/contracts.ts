@@ -63,6 +63,7 @@ export interface VoiceInteractionRequest {
   readonly audio: AudioData;
   readonly ownerProfileId: string;
   readonly signal?: AbortSignal;
+  readonly onStateChange?: (state: VoiceInteractionState) => void;
 }
 
 interface VoiceInteractionResultBase {

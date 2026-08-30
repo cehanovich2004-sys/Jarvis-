@@ -10,7 +10,8 @@
   },
   "bin": {
     "jarvis": "dist/src/cli.js",
-    "jarvis-core": "dist/src/server.js"
+    "jarvis-core": "dist/src/server.js",
+    "jarvis-voice": "dist/src/live-voice/cli.js"
   },
   "scripts": {
     "postinstall": "node scripts/link-local-bin.mjs",
@@ -21,6 +22,7 @@
     "test": "pnpm build && node --test dist/tests/unit/*.test.js",
     "test:integration": "pnpm build && node --test dist/tests/integration/*.test.js",
     "jarvis": "node dist/src/cli.js",
+    "jarvis:voice": "pnpm build && node dist/src/live-voice/cli.js",
     "start": "node dist/src/server.js"
   },
   "devDependencies": {

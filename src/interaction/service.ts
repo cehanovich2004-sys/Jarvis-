@@ -33,7 +33,7 @@ export class VoiceInteractionService {
   }
 
   async run(request: VoiceInteractionRequest): Promise<VoiceInteractionResult> {
-    const machine = new VoiceInteractionStateMachine();
+    const machine = new VoiceInteractionStateMachine(request.onStateChange);
     const signal = request.signal;
     let execution: ToolExecutionResult | null = null;
     let responseText: string | null = null;

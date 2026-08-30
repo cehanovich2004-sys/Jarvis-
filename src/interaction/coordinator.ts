@@ -39,7 +39,10 @@ export class VoiceInteractionCoordinator {
         this.#service.run({
           audio: request.audio,
           ownerProfileId: request.ownerProfileId,
-          signal: controller.signal
+          signal: controller.signal,
+          ...(request.onStateChange === undefined
+            ? {}
+            : { onStateChange: request.onStateChange })
         })
       )
       .finally(() => {

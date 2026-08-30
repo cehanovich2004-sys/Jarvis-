@@ -17,3 +17,4 @@ export * from "./conversation/index.js";
 export * from "./personality/index.js";
 export * from "./memory/index.js";
 export * from "./cloud/index.js";
+export * from "./live-voice/index.js";
