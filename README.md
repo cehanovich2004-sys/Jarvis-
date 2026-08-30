@@ -15,6 +15,7 @@ It provides:
 - Local-first speech-to-text contracts with an optional `whisper.cpp` loopback runtime
 - Deterministic intent routing and an explicit safe macOS tool allowlist
 - Cancellable local text-to-speech through the native macOS speech process
+- Identity-gated deterministic voice interaction orchestration
 
 ## Requirements
 
@@ -95,3 +96,6 @@ boundary.
 
 See [Local Text-To-Speech](docs/tts.md) for the J6 playback contract, configuration, and cancellation
 lifecycle.
+
+See [Voice Interaction Orchestration](docs/voice-loop.md) for the J7 state machine, identity gate,
+and cancellation behavior.
