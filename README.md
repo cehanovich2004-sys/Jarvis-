@@ -17,6 +17,7 @@ It provides:
 - Cancellable local text-to-speech through the native macOS speech process
 - Identity-gated deterministic voice interaction orchestration
 - Local-first structured intelligence fallback through a validated Ollama boundary
+- Bounded expiring short-term conversation sessions with structured context
 
 ## Requirements
 
@@ -102,3 +103,6 @@ See [Voice Interaction Orchestration](docs/voice-loop.md) for the J7 state machi
 and cancellation behavior.
 
 See [Local LLM Foundation](docs/local-llm.md) for the J8 runtime, validation, and security boundary.
+
+See [Short-Term Conversation Context](docs/conversation-context.md) for J9 session limits, expiry,
+and follow-up routing.
