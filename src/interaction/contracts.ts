@@ -21,6 +21,7 @@ export type VoiceInteractionState =
   | "NO_SPEECH"
   | "UNCERTAIN_SPEECH"
   | "NO_MATCH"
+  | "INTERRUPTED"
   | "CANCELLED"
   | "ERROR";
 
@@ -31,6 +32,7 @@ export type VoiceInteractionTerminalState =
   | "NO_SPEECH"
   | "UNCERTAIN_SPEECH"
   | "NO_MATCH"
+  | "INTERRUPTED"
   | "CANCELLED"
   | "ERROR";
 
@@ -97,6 +99,13 @@ export interface CancelledVoiceInteractionResult extends VoiceInteractionResultB
   readonly execution: ToolExecutionResult | null;
 }
 
+export interface InterruptedVoiceInteractionResult extends VoiceInteractionResultBase {
+  readonly state: "INTERRUPTED";
+  readonly responseText: string | null;
+  readonly playback: null;
+  readonly execution: ToolExecutionResult | null;
+}
+
 export interface FailedVoiceInteractionResult extends VoiceInteractionResultBase {
   readonly state: "ERROR";
   readonly errorCode: "INTERACTION_FAILED" | "TOOL_EXECUTION_FAILED";
@@ -105,5 +114,6 @@ export interface FailedVoiceInteractionResult extends VoiceInteractionResultBase
 export type VoiceInteractionResult =
   | CompletedVoiceInteractionResult
   | DeclinedVoiceInteractionResult
+  | InterruptedVoiceInteractionResult
   | CancelledVoiceInteractionResult
   | FailedVoiceInteractionResult;

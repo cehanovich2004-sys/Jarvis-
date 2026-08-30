@@ -19,6 +19,7 @@ It provides:
 - Local-first structured intelligence fallback through a validated Ollama boundary
 - Bounded expiring short-term conversation sessions with structured context
 - Deterministic presentation-only response personality with bounded humor
+- Deterministic barge-in coordination with cancellable playback and exclusive tool execution
 
 ## Requirements
 
@@ -109,3 +110,5 @@ See [Short-Term Conversation Context](docs/conversation-context.md) for J9 sessi
 and follow-up routing.
 
 See [Personality And Response Style](docs/personality.md) for J10 tone, humor, and safety rules.
+
+See [Barge-In And Interruption](docs/barge-in.md) for J11 ownership, handoff, and race guarantees.
