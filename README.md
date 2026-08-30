@@ -20,6 +20,7 @@ It provides:
 - Bounded expiring short-term conversation sessions with structured context
 - Deterministic presentation-only response personality with bounded humor
 - Deterministic barge-in coordination with cancellable playback and exclusive tool execution
+- Explicit privacy-controlled long-term memory with replaceable local persistence
 
 ## Requirements
 
@@ -112,3 +113,5 @@ and follow-up routing.
 See [Personality And Response Style](docs/personality.md) for J10 tone, humor, and safety rules.
 
 See [Barge-In And Interruption](docs/barge-in.md) for J11 ownership, handoff, and race guarantees.
+
+See [Long-Term Memory](docs/long-term-memory.md) for J12 consent, privacy, retention, and persistence.

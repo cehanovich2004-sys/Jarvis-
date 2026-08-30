@@ -15,3 +15,4 @@ export * from "./interaction/index.js";
 export * from "./llm/index.js";
 export * from "./conversation/index.js";
 export * from "./personality/index.js";
+export * from "./memory/index.js";
