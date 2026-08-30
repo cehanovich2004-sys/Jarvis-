@@ -9,16 +9,19 @@ import type {
   VoiceInteractionResult,
   VoiceInteractionTerminalState
 } from "./contracts.js";
-import { DeterministicResponseGenerator } from "./responses.js";
+import {
+  DeterministicResponseGenerator,
+  type InteractionResponseGenerator
+} from "./responses.js";
 import { VoiceInteractionStateMachine } from "./state-machine.js";
 
 export class VoiceInteractionService {
   readonly #dependencies: VoiceInteractionDependencies;
-  readonly #responses: DeterministicResponseGenerator;
+  readonly #responses: InteractionResponseGenerator;
 
   constructor(
     dependencies: VoiceInteractionDependencies,
-    responses: DeterministicResponseGenerator = new DeterministicResponseGenerator()
+    responses: InteractionResponseGenerator = new DeterministicResponseGenerator()
   ) {
     this.#dependencies = dependencies;
     this.#responses = responses;

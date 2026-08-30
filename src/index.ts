@@ -14,3 +14,4 @@ export * from "./tts/index.js";
 export * from "./interaction/index.js";
 export * from "./llm/index.js";
 export * from "./conversation/index.js";
+export * from "./personality/index.js";
