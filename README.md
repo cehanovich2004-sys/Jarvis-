@@ -18,6 +18,7 @@ It provides:
 - Identity-gated deterministic voice interaction orchestration
 - Local-first structured intelligence fallback through a validated Ollama boundary
 - Bounded expiring short-term conversation sessions with structured context
+- Deterministic presentation-only response personality with bounded humor
 
 ## Requirements
 
@@ -106,3 +107,5 @@ See [Local LLM Foundation](docs/local-llm.md) for the J8 runtime, validation, an
 
 See [Short-Term Conversation Context](docs/conversation-context.md) for J9 session limits, expiry,
 and follow-up routing.
+
+See [Personality And Response Style](docs/personality.md) for J10 tone, humor, and safety rules.

@@ -11,7 +11,13 @@ const ALTERNATE_RESPONSES: Readonly<
   NO_MATCH: "Команда не распознана."
 };
 
-export class DeterministicResponseGenerator {
+export interface InteractionResponseGenerator {
+  forExecutionFailure(): string;
+  forAlternateState(state: VoiceInteractionTerminalState): string;
+  forExecution(result: ToolExecutionResult): string;
+}
+
+export class DeterministicResponseGenerator implements InteractionResponseGenerator {
   forExecutionFailure(): string {
     return "Не удалось выполнить команду.";
   }
