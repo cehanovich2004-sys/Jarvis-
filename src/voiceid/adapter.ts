@@ -39,7 +39,7 @@ export class VoiceIDAdapter {
     this.#operationTimeoutMilliseconds = operationTimeoutMilliseconds;
   }
 
-  async extractEmbedding(audio: AudioData): Promise<SpeakerEmbedding> {
+  async extractEmbedding(audio: AudioData, signal?: AbortSignal): Promise<SpeakerEmbedding> {
     validateVoiceIDAudio(audio);
     const input = {
       waveform: audio.samples.slice(),
@@ -52,7 +52,8 @@ export class VoiceIDAdapter {
     try {
       result = await withTimeout(
         (signal) => this.#runtime.extractEmbedding(input, signal),
-        this.#operationTimeoutMilliseconds
+        this.#operationTimeoutMilliseconds,
+        signal
       );
     } catch {
       throw embeddingFailure();
@@ -84,7 +85,11 @@ export class VoiceIDAdapter {
     };
   }
 
-  async compare(reference: SpeakerEmbedding, candidate: SpeakerEmbedding): Promise<number> {
+  async compare(
+    reference: SpeakerEmbedding,
+    candidate: SpeakerEmbedding,
+    signal?: AbortSignal
+  ): Promise<number> {
     validateEmbedding(reference);
     validateEmbedding(candidate);
     assertCompatible(reference.metadata, candidate.metadata);
@@ -99,7 +104,8 @@ export class VoiceIDAdapter {
             { ...reference.metadata },
             signal
           ),
-        this.#operationTimeoutMilliseconds
+        this.#operationTimeoutMilliseconds,
+        signal
       );
     } catch {
       throw verificationFailure();
@@ -296,9 +302,13 @@ function finiteElapsed(startedAt: number): number {
 
 async function withTimeout<T>(
   operation: (signal: AbortSignal) => Promise<T>,
-  timeoutMilliseconds: number
+  timeoutMilliseconds: number,
+  externalSignal?: AbortSignal
 ): Promise<T> {
   const controller = new AbortController();
+  const cancel = (): void => controller.abort(externalSignal?.reason);
+  if (externalSignal?.aborted === true) cancel();
+  else externalSignal?.addEventListener("abort", cancel, { once: true });
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const timedOut = new Promise<never>((_resolve, reject) => {
     timeout = setTimeout(() => {
@@ -314,5 +324,6 @@ async function withTimeout<T>(
       clearTimeout(timeout);
     }
     controller.abort();
+    externalSignal?.removeEventListener("abort", cancel);
   }
 }

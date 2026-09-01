@@ -34,7 +34,9 @@ export class DeterministicIntentRouter implements IntentRouter {
     if (typeof transcript.text !== "string") {
       return { status: "NO_MATCH", command: null };
     }
-    const normalized = transcript.text.normalize("NFKC").trim().toLocaleLowerCase("ru-RU");
+    const normalized = stripSafeInvocationPrefix(
+      transcript.text.normalize("NFKC").trim().toLocaleLowerCase("ru-RU")
+    );
     const battery = BATTERY_PATTERNS.some((pattern) => pattern.test(normalized));
     if (battery) {
       return { status: "MATCHED", command: commandForBattery() };
@@ -51,6 +53,10 @@ export class DeterministicIntentRouter implements IntentRouter {
     }
     return { status: "NO_MATCH", command: null };
   }
+}
+
+function stripSafeInvocationPrefix(value: string): string {
+  return value.replace(/^слушай[,.]?[ ]+/u, "");
 }
 
 function commandForApplication(application: AllowedApplication): StructuredCommand {

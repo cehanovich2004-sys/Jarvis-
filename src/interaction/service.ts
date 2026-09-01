@@ -49,6 +49,7 @@ export class VoiceInteractionService {
         signal
       );
       throwIfAborted(signal);
+      notifyIdentity(request.onIdentity, identity);
       if (identity.status !== "AUTHORIZED") {
         return await this.#decline(
           machine,
@@ -72,6 +73,7 @@ export class VoiceInteractionService {
       if (transcript.status === "UNCERTAIN") {
         return await this.#decline(machine, "UNCERTAIN_SPEECH", signal);
       }
+      notifyTranscript(request.onTranscript, transcript.text, transcript.language);
 
       machine.transition("UNDERSTANDING");
       const routing = this.#dependencies.intentRouter.route(transcript);
@@ -178,6 +180,29 @@ export class VoiceInteractionService {
       ),
       signal
     );
+  }
+}
+
+function notifyTranscript(
+  observer: VoiceInteractionRequest["onTranscript"],
+  text: string,
+  language: string | undefined
+): void {
+  try {
+    observer?.(text, language);
+  } catch {
+    // Diagnostic observation cannot alter routing or security behavior.
+  }
+}
+
+function notifyIdentity(
+  observer: VoiceInteractionRequest["onIdentity"],
+  result: import("../voiceid/contracts.js").SpeakerVerificationResult
+): void {
+  try {
+    observer?.(result);
+  } catch {
+    // Diagnostic observation cannot alter identity or security behavior.
   }
 }
 

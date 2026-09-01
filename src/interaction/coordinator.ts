@@ -42,7 +42,13 @@ export class VoiceInteractionCoordinator {
           signal: controller.signal,
           ...(request.onStateChange === undefined
             ? {}
-            : { onStateChange: request.onStateChange })
+            : { onStateChange: request.onStateChange }),
+          ...(request.onTranscript === undefined
+            ? {}
+            : { onTranscript: request.onTranscript }),
+          ...(request.onIdentity === undefined
+            ? {}
+            : { onIdentity: request.onIdentity })
         })
       )
       .finally(() => {

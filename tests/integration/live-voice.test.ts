@@ -172,8 +172,14 @@ function live(options: {
 
 test("captured utterance traverses identity, STT, routing, verified execution, and TTS", async () => {
   const states: string[] = [];
+  const transcripts: string[] = [];
+  const identities: string[] = [];
   const { mode, executor, stt } = live();
-  const result = await mode.runOneShot({ onStateChange: (state) => states.push(state) });
+  const result = await mode.runOneShot({
+    onStateChange: (state) => states.push(state),
+    onTranscript: (text, language) => transcripts.push(`${language}:${text}`),
+    onIdentity: (identity) => identities.push(identity.status)
+  });
   assert.equal(result.state, "COMPLETE");
   assert.equal(executor.calls, 1);
   assert.equal(stt.calls, 1);
@@ -181,6 +187,8 @@ test("captured utterance traverses identity, STT, routing, verified execution, a
     "LISTENING", "START", "VERIFYING_SPEAKER", "TRANSCRIBING", "UNDERSTANDING",
     "EXECUTING", "RESPONDING", "COMPLETE"
   ]);
+  assert.deepEqual(transcripts, ["ru:Какой заряд батареи?"]);
+  assert.deepEqual(identities, ["AUTHORIZED"]);
   assert.equal("audio" in result, false);
 });
 
