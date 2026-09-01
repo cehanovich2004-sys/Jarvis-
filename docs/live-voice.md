@@ -52,6 +52,17 @@ Delete the local profile with `pnpm jarvis:voice:enroll -- --delete`. Enrollment
 in memory until embeddings are extracted. The atomic local profile has `0600` permissions and stores
 embeddings plus compatibility metadata, never raw audio.
 
+An existing VoiceID enrollment can instead be imported explicitly by participant code. The bridge
+opens the VoiceID database read-only, derives fresh embeddings through the unchanged VoiceID
+pipeline, and copies neither WAV files nor the participant database into JARVIS:
+
+```bash
+pnpm jarvis:voice:import-voiceid -- P0001
+```
+
+Replace `P0001` with the owner code supplied by the operator. JARVIS never searches for a likely
+owner or imports multiple participants automatically.
+
 ## Development-Only Policy
 
 VoiceID has no approved production threshold. Voice mode fails closed unless a future calibrated
@@ -73,8 +84,19 @@ similarity; future calibration must evaluate aggregation with FAR, FRR, and EER.
 A capture-only diagnostic remains available:
 
 ```bash
-pnpm jarvis:voice --microphone-smoke
+pnpm jarvis:voice -- --microphone-smoke
 ```
+
+AVFoundation device indexes are host-dependent. List them before the first run and set the audio
+device index explicitly when index `0` is not the intended microphone:
+
+```bash
+ffmpeg -hide_banner -f avfoundation -list_devices true -i ''
+JARVIS_MICROPHONE_DEVICE_INDEX=1 pnpm jarvis:voice -- --microphone-smoke
+```
+
+The energy threshold is also device-dependent. Tune it only from measured local microphone levels;
+do not lower it merely to force a successful identity smoke.
 
 Normal one-shot mode starts a managed loopback-only whisper.cpp server, waits for readiness, runs one
 complete interaction, and terminates every owned process:
@@ -97,3 +119,5 @@ Configuration:
 
 `Ctrl+C` propagates through microphone capture, VoiceID inference, STT, interaction, and TTS.
 Operational states contain no raw audio, embeddings, model prompts, or secrets.
+Set `JARVIS_VOICE_SHOW_TRANSCRIPT=1` or `JARVIS_VOICE_SHOW_IDENTITY_SCORE=1` only for an attended
+local diagnostic. Error output exposes a bounded JARVIS error code, never backend output.

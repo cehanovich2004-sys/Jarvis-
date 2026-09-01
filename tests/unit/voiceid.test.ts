@@ -546,6 +546,49 @@ test("Python VoiceID runtime terminates its process on cancellation", async () =
   }
 });
 
+test("Python VoiceID runtime imports multiple enrollment references through its typed bridge", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-voiceid-import-"));
+  const script = join(directory, "bridge.py");
+  const bridge = [
+    "import json,sys",
+    "for line in sys.stdin:",
+    " request=json.loads(line)",
+    " embedding={'status':'VALID','embedding':[1.0]+[0.0]*191,'metadata':{}}",
+    " result={'status':'VALID','participantCode':request['payload']['participantCode'],'embeddings':[embedding,embedding]}",
+    " print(json.dumps({'id':request['id'],'result':result}),flush=True)"
+  ].join("\n");
+  await writeFile(script, bridge, { mode: 0o700 });
+  const runtime = new PythonVoiceIDRuntimeClient({
+    pythonExecutable: "/usr/bin/python3",
+    bridgeScript: script,
+    voiceIdSourceDirectory: directory,
+    modelCacheDirectory: directory,
+    voiceIdDataDirectory: directory
+  });
+  try {
+    const references = await runtime.importEnrollmentProfile("P0001");
+    assert.equal(references.length, 2);
+    assert.equal(references.every((item) => item.status === "VALID"), true);
+    await assert.rejects(runtime.importEnrollmentProfile("owner-main"), hasCode("SPEAKER_MODEL_UNAVAILABLE"));
+  } finally {
+    await runtime.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test("Python VoiceID runtime rejects an unsafe optional enrollment data path", () => {
+  assert.throws(
+    () => new PythonVoiceIDRuntimeClient({
+      pythonExecutable: "/usr/bin/python3",
+      bridgeScript: "/tmp/bridge.py",
+      voiceIdSourceDirectory: "/tmp/voiceid-src",
+      modelCacheDirectory: "/tmp/model-cache",
+      voiceIdDataDirectory: "relative/voiceid-data"
+    }),
+    hasCode("SPEAKER_MODEL_UNAVAILABLE")
+  );
+});
+
 function hasCode(code: string): (error: unknown) => boolean {
   return (error) => error instanceof JarvisError && error.code === code;
 }

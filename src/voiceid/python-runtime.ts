@@ -35,13 +35,15 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
   #reader: Interface | undefined;
   #nextRequestId = 1;
   #pending = new Map<number, PendingRequest>();
+  #termination: Promise<boolean> | undefined;
 
   constructor(options: PythonVoiceIDRuntimeOptions) {
     for (const path of [
       options.pythonExecutable,
       options.bridgeScript,
       options.voiceIdSourceDirectory,
-      options.modelCacheDirectory
+      options.modelCacheDirectory,
+      ...(options.voiceIdDataDirectory === undefined ? [] : [options.voiceIdDataDirectory])
     ]) {
       if (!isAbsoluteSafePath(path)) throw unavailable();
     }
@@ -91,6 +93,9 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
 
   async close(): Promise<void> {
     this.#stop(new Error("VoiceID runtime closed."));
+    if (this.#termination !== undefined && !(await this.#termination)) {
+      throw unavailable();
+    }
   }
 
   async #request(
@@ -122,12 +127,19 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
 
   async #ensureStarted(): Promise<void> {
     if (this.#process !== undefined) return;
+    if (this.#termination !== undefined) {
+      if (!(await this.#termination)) throw unavailable();
+      this.#termination = undefined;
+    }
     try {
       await Promise.all([
         access(this.#options.pythonExecutable),
         access(this.#options.bridgeScript),
         access(this.#options.voiceIdSourceDirectory),
-        access(this.#options.modelCacheDirectory)
+        access(this.#options.modelCacheDirectory),
+        ...(this.#options.voiceIdDataDirectory === undefined
+          ? []
+          : [access(this.#options.voiceIdDataDirectory)])
       ]);
     } catch {
       throw unavailable();
@@ -150,7 +162,7 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
     this.#reader = createInterface({ input: process.stdout });
     this.#reader.on("line", (line) => this.#handleLine(line));
     process.once("error", () => this.#stop(unavailable()));
-    process.once("exit", () => this.#stop(unavailable()));
+    process.once("exit", () => this.#handleProcessExit(process));
   }
 
   #handleLine(line: string): void {
@@ -177,12 +189,21 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
     this.#process = undefined;
     this.#reader?.close();
     this.#reader = undefined;
-    process?.kill("SIGKILL");
+    if (process !== undefined && process.exitCode === null && process.signalCode === null) {
+      process.kill("SIGKILL");
+      this.#termination = waitForExit(process, 1_000);
+    }
     for (const pending of this.#pending.values()) {
       removeAbort(pending);
       pending.reject(reason);
     }
     this.#pending.clear();
+  }
+
+  #handleProcessExit(process: ChildProcessWithoutNullStreams): void {
+    if (this.#process === process) {
+      this.#stop(unavailable());
+    }
   }
 }
 
@@ -247,6 +268,24 @@ function isAbsoluteSafePath(value: string): boolean {
 
 function isAborted(signal: AbortSignal | undefined): boolean {
   return signal?.aborted === true;
+}
+
+async function waitForExit(
+  process: ChildProcessWithoutNullStreams,
+  timeoutMilliseconds: number
+): Promise<boolean> {
+  if (process.exitCode !== null || process.signalCode !== null) return true;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      new Promise<true>((resolve) => process.once("exit", () => resolve(true))),
+      new Promise<false>((resolve) => {
+        timeout = setTimeout(() => resolve(false), timeoutMilliseconds);
+      })
+    ]);
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout);
+  }
 }
 
 function unavailable(): JarvisError {

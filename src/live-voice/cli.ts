@@ -53,10 +53,13 @@ try {
           : {})
       });
       console.log(`RESULT ${result.state}`);
+      if (result.state === "ERROR") {
+        console.log(`ERROR_CODE ${result.errorCode}`);
+      }
       if (result.interaction?.responseText !== null && result.interaction?.responseText !== undefined) {
         console.log(`RESPONSE ${result.interaction.responseText}`);
       }
-      printLatency("CAPTURE_END_OF_UTTERANCE_MS", stageStartedAt, "LISTENING", "START");
+      printLatency("CAPTURE_END_OF_UTTERANCE_MS", stageStartedAt, "LISTENING", "VERIFYING_SPEAKER");
       printLatency("VOICEID_MS", stageStartedAt, "VERIFYING_SPEAKER", "TRANSCRIBING");
       printLatency("STT_MS", stageStartedAt, "TRANSCRIBING", "UNDERSTANDING");
       printLatency("TOOL_MS", stageStartedAt, "EXECUTING", "RESPONDING");
