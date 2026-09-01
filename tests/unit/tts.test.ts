@@ -153,6 +153,10 @@ test("maps voice, playback, thrown, and malformed runtime failures safely", asyn
     serviceFor({ status: "BROKEN" } as never).speak({ text: "test" }),
     "TTS_INVALID_RESPONSE"
   );
+  await assertJarvisCode(
+    serviceFor({ status: "COMPLETED", processStartupLatencyMs: Number.NaN }).speak({ text: "test" }),
+    "TTS_INVALID_RESPONSE"
+  );
   const hostileMetadata = new FakeRuntime(async () => ({ status: "COMPLETED" }));
   Object.defineProperty(hostileMetadata, "metadata", {
     get() {
@@ -215,12 +219,17 @@ test("maps macOS say to fixed executable and argv and rejects forged invocation"
 });
 
 test("concrete macOS runtime passes config to a cancellable process runner", async () => {
-  const runner = new FakeProcessRunner(async () => ({ exitCode: 0 }));
+  const runner = new FakeProcessRunner(async () => ({
+    exitCode: 0,
+    processStartupLatencyMs: 2
+  }));
   const runtime = new MacOSSystemSpeechRuntime("Milena", 180, runner);
-  assert.deepEqual(await runtime.speak({ text: "Готово." }), { status: "COMPLETED" });
+  const result = await runtime.speak({ text: "Готово." });
+  assert.deepEqual(result, { status: "COMPLETED", processStartupLatencyMs: 2 });
   assert.deepEqual(runner.inputs, [
     { text: "Готово.", voice: "Milena", rateWordsPerMinute: 180 }
   ]);
+  assert.equal(result.processStartupLatencyMs, 2);
 
   const abortAware = new FakeProcessRunner(
     async (_input, signal) =>

@@ -17,6 +17,7 @@ export interface SpeechPlaybackResult {
   readonly status: "COMPLETED";
   readonly characterCount: number;
   readonly playbackLatencyMs: number;
+  readonly processStartupLatencyMs?: number;
   readonly backendMetadata: TTSBackendMetadata;
 }
 

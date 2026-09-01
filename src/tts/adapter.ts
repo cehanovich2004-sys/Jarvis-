@@ -75,10 +75,20 @@ export class TextToSpeechAdapter {
       if (runtimeResult.status !== "COMPLETED") {
         throw invalidResponse();
       }
+      if (
+        runtimeResult.processStartupLatencyMs !== undefined &&
+        (!Number.isFinite(runtimeResult.processStartupLatencyMs) ||
+          runtimeResult.processStartupLatencyMs < 0)
+      ) {
+        throw invalidResponse();
+      }
       return {
         status: "COMPLETED",
         characterCount: text.length,
         playbackLatencyMs: finiteElapsed(startedAt),
+        ...(runtimeResult.processStartupLatencyMs === undefined
+          ? {}
+          : { processStartupLatencyMs: runtimeResult.processStartupLatencyMs }),
         backendMetadata: { ...this.#metadata }
       };
     } catch (error) {
