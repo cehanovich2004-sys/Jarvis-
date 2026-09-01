@@ -14,12 +14,14 @@ export interface WhisperServerProcessOptions {
   readonly startupTimeoutMilliseconds?: number;
   readonly fetch?: typeof globalThis.fetch;
   readonly spawnProcess?: typeof spawn;
+  readonly accessPath?: typeof access;
 }
 
 export class WhisperServerProcess {
   readonly #options: WhisperServerProcessOptions;
   readonly #fetch: typeof globalThis.fetch;
   readonly #spawn: typeof spawn;
+  readonly #accessPath: typeof access;
   #process: ChildProcess | undefined;
 
   constructor(options: WhisperServerProcessOptions) {
@@ -30,12 +32,13 @@ export class WhisperServerProcess {
     this.#options = options;
     this.#fetch = options.fetch ?? globalThis.fetch;
     this.#spawn = options.spawnProcess ?? spawn;
+    this.#accessPath = options.accessPath ?? access;
   }
 
   async start(signal?: AbortSignal): Promise<void> {
     if (this.#process !== undefined) return;
     try {
-      await access(this.#options.executable);
+      await this.#accessPath(this.#options.executable);
       const model = await lstat(this.#options.modelPath);
       if (!model.isFile() || model.isSymbolicLink() || model.size < 1_000_000) throw unavailable();
     } catch (error) {

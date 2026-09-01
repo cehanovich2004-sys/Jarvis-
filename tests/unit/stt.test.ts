@@ -492,6 +492,7 @@ test("managed whisper.cpp server is loopback-only, shell-free, ready, and cleane
     modelPath: model,
     endpoint: "http://127.0.0.1:8080/inference",
     spawnProcess,
+    accessPath: async () => undefined,
     fetch: async () => new Response("ok", { status: 200 })
   });
   try {
