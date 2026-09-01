@@ -227,6 +227,12 @@ def main() -> int:
                     response = {"status": "INVALID", "errorCode": "MODEL_CACHE_MISSING"}
                 else:
                     response = _import_enrollment(service, payload)
+            elif operation == "warmup":
+                response = (
+                    {"status": "READY"}
+                    if service is not None
+                    else {"status": "INVALID", "errorCode": "MODEL_CACHE_MISSING"}
+                )
             else:
                 raise ValueError("INVALID_REQUEST")
         except (KeyboardInterrupt, SystemExit):
