@@ -81,6 +81,7 @@ export function createMacOSLiveVoiceMode(options: MacOSLiveVoiceFactoryOptions):
       }),
       {
         timeoutMilliseconds: config.captureTimeoutMilliseconds,
+        preRollMilliseconds: config.preRollMilliseconds,
         limits: {
           maxDurationSeconds: config.maximumDurationSeconds,
           maxBufferBytes: 16_000 * config.maximumDurationSeconds * Float32Array.BYTES_PER_ELEMENT
@@ -109,6 +110,7 @@ export function createMacOSMicrophoneDiagnostic(
     }),
     {
       timeoutMilliseconds: config.captureTimeoutMilliseconds,
+      preRollMilliseconds: config.preRollMilliseconds,
       limits: {
         maxDurationSeconds: config.maximumDurationSeconds,
         maxBufferBytes: 16_000 * config.maximumDurationSeconds * Float32Array.BYTES_PER_ELEMENT

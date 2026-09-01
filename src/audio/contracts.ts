@@ -20,7 +20,12 @@ export interface AudioLimits {
   readonly maxBufferBytes: number;
 }
 
-export type VoiceActivity = "SILENCE" | "SPEECH_START" | "SPEECH" | "SPEECH_END";
+export type VoiceActivity =
+  | "SILENCE"
+  | "SPEECH_START"
+  | "SPEECH"
+  | "TRAILING_SILENCE"
+  | "SPEECH_END";
 
 export type AudioSessionState =
   | "START"

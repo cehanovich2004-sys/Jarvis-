@@ -4,6 +4,7 @@ import type {
   VoiceInteractionTerminalState
 } from "../interaction/contracts.js";
 import type { SpeakerVerificationResult } from "../voiceid/contracts.js";
+import type { VoiceActivity } from "../audio/contracts.js";
 
 export type LiveVoiceState = "IDLE" | "LISTENING" | VoiceInteractionState;
 
@@ -12,6 +13,7 @@ export interface LiveVoiceRunOptions {
   readonly onStateChange?: (state: LiveVoiceState) => void;
   readonly onTranscript?: (text: string, language?: string) => void;
   readonly onIdentity?: (result: SpeakerVerificationResult) => void;
+  readonly onVoiceActivity?: (activity: VoiceActivity) => void;
 }
 
 export type LiveVoiceResult =

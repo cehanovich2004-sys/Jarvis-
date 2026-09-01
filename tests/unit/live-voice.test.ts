@@ -69,11 +69,20 @@ test("energy VAD detects speech and a deterministic end-of-utterance silence", a
   assert.equal(await vad.process(chunk(0)), "SILENCE");
   assert.equal(await vad.process(chunk(0.1)), "SPEECH_START");
   assert.equal(await vad.process(chunk(0.1)), "SPEECH");
-  assert.equal(await vad.process(chunk(0)), "SPEECH");
-  assert.equal(await vad.process(chunk(0)), "SPEECH");
+  assert.equal(await vad.process(chunk(0)), "TRAILING_SILENCE");
+  assert.equal(await vad.process(chunk(0)), "TRAILING_SILENCE");
   assert.equal(await vad.process(chunk(0)), "SPEECH_END");
   vad.reset();
   assert.equal(await vad.process(chunk(0)), "SILENCE");
+});
+
+test("energy VAD default preserves brief pauses and ends after 500 ms", async () => {
+  const vad = new EnergyVoiceActivityDetector();
+  assert.equal(await vad.process(chunk(0.1)), "SPEECH_START");
+  for (let index = 0; index < 4; index += 1) {
+    assert.equal(await vad.process(chunk(0)), "TRAILING_SILENCE");
+  }
+  assert.equal(await vad.process(chunk(0)), "SPEECH_END");
 });
 
 test("macOS microphone adapter emits mono 16 kHz float32 from fragmented bytes", async () => {
@@ -183,7 +192,8 @@ test("loads bounded one-shot live voice configuration", () => {
     captureTimeoutMilliseconds: 15_000,
     maximumDurationSeconds: 30,
     speechThreshold: 0.015,
-    endSilenceMilliseconds: 700
+    endSilenceMilliseconds: 500,
+    preRollMilliseconds: 300
   });
   assert.throws(
     () => loadLiveVoiceConfiguration({ JARVIS_MICROPHONE_FFMPEG: "/tmp/ffmpeg" }),
