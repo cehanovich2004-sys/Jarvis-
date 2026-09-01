@@ -7,7 +7,7 @@ export interface TTSRuntimeInput {
 }
 
 export type TTSRuntimeResult =
-  | { readonly status: "COMPLETED" }
+  | { readonly status: "COMPLETED"; readonly processStartupLatencyMs?: number }
   | { readonly status: "INVALID"; readonly errorCode: TTSRuntimeErrorCode };
 
 export interface TTSRuntimeClient {

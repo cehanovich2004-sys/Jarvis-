@@ -98,8 +98,10 @@ JARVIS_MICROPHONE_DEVICE_INDEX=1 pnpm jarvis:voice -- --microphone-smoke
 The energy threshold is also device-dependent. Tune it only from measured local microphone levels;
 do not lower it merely to force a successful identity smoke.
 
-Normal one-shot mode starts a managed loopback-only whisper.cpp server, waits for readiness, runs one
-complete interaction, and terminates every owned process:
+Normal one-shot mode starts a managed loopback-only whisper.cpp server, waits for readiness, warms
+the long-lived VoiceID runtime before listening, runs one complete interaction, and terminates every
+owned process. Capture retains only a bounded 300 ms pre-roll so a threshold crossing does not clip
+the beginning of a short command:
 
 ```bash
 pnpm jarvis:voice
@@ -113,7 +115,8 @@ Configuration:
 - `JARVIS_VOICE_CAPTURE_TIMEOUT_MS` (default `15000`)
 - `JARVIS_VOICE_MAX_DURATION_SECONDS` (default `30`, maximum `60`)
 - `JARVIS_VAD_SPEECH_THRESHOLD` (default `0.015`)
-- `JARVIS_VAD_END_SILENCE_MS` (default `700`)
+- `JARVIS_VAD_END_SILENCE_MS` (default `500`)
+- `JARVIS_VOICE_PRE_ROLL_MS` (default `300`, maximum `1000`)
 - `JARVIS_STT_ENDPOINT` (default `http://127.0.0.1:8080/inference`)
 - `JARVIS_STT_LANGUAGE` (`AUTO`, `RU`, or `EN`)
 
@@ -121,3 +124,6 @@ Configuration:
 Operational states contain no raw audio, embeddings, model prompts, or secrets.
 Set `JARVIS_VOICE_SHOW_TRANSCRIPT=1` or `JARVIS_VOICE_SHOW_IDENTITY_SCORE=1` only for an attended
 local diagnostic. Error output exposes a bounded JARVIS error code, never backend output.
+Attended diagnostics report speech-start/end-of-utterance, trailing-silence, VoiceID, STT, tool,
+full TTS playback, and total timings. `TTS_PROCESS_STARTUP_MS` measures process startup only; it is
+not presented as time to first audible sample because `/usr/bin/say` exposes no audio-onset event.

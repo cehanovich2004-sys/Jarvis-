@@ -576,6 +576,28 @@ test("Python VoiceID runtime imports multiple enrollment references through its 
   }
 });
 
+test("Python VoiceID runtime supports an explicit bounded warmup", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "jarvis-voiceid-warmup-"));
+  const script = join(directory, "bridge.py");
+  await writeFile(
+    script,
+    "import json,sys\nfor line in sys.stdin:\n request=json.loads(line)\n print(json.dumps({'id':request['id'],'result':{'status':'READY'}}),flush=True)\n",
+    { mode: 0o700 }
+  );
+  const runtime = new PythonVoiceIDRuntimeClient({
+    pythonExecutable: "/usr/bin/python3",
+    bridgeScript: script,
+    voiceIdSourceDirectory: directory,
+    modelCacheDirectory: directory
+  });
+  try {
+    await runtime.warmup();
+  } finally {
+    await runtime.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
 test("Python VoiceID runtime rejects an unsafe optional enrollment data path", () => {
   assert.throws(
     () => new PythonVoiceIDRuntimeClient({

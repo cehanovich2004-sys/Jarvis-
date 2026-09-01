@@ -207,6 +207,48 @@ test("audio session completes on a valid VAD lifecycle and releases resources", 
   assert.equal(vad.resetCount, 2);
 });
 
+test("audio session preserves only bounded pre-roll and reports activity safely", async () => {
+  const frame = (value: number) => chunk(new Float32Array(1_600).fill(value));
+  const input = new TrackingInput([
+    frame(0.01),
+    frame(0.02),
+    frame(0.03),
+    frame(0.5),
+    frame(0)
+  ]);
+  const vad = new SequenceVad([
+    "SILENCE",
+    "SILENCE",
+    "SILENCE",
+    "SPEECH_START",
+    "SPEECH_END"
+  ]);
+  const activities: VoiceActivity[] = [];
+  const session = new AudioSession(input, vad, {
+    timeoutMilliseconds: 1_000,
+    preRollMilliseconds: 200
+  });
+
+  const result = await session.run(undefined, (activity) => activities.push(activity));
+
+  assert.equal(result.state, "COMPLETE");
+  if (result.state !== "COMPLETE") return;
+  assert.equal(result.audio.samples.length, 6_400);
+  const observed = [0, 1_600, 3_200, 4_800].map(
+    (offset) => result.audio.samples[offset] ?? Number.NaN
+  );
+  assert.equal(Math.abs(observed[0]! - 0.02) < 1e-6, true);
+  assert.equal(Math.abs(observed[1]! - 0.03) < 1e-6, true);
+  assert.deepEqual(observed.slice(2), [0.5, 0]);
+  assert.deepEqual(activities, [
+    "SILENCE",
+    "SILENCE",
+    "SILENCE",
+    "SPEECH_START",
+    "SPEECH_END"
+  ]);
+});
+
 test("audio session returns timeout and closes a hanging microphone", async () => {
   const input = new HangingInput();
   const session = new AudioSession(input, new SequenceVad([]), { timeoutMilliseconds: 5 });

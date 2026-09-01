@@ -34,7 +34,10 @@ export class LiveVoiceMode {
     let audioDurationSeconds: number | null = null;
     try {
       notify(options.onStateChange, "LISTENING");
-      const captured = await this.#audioSessionFactory().run(options.signal);
+      const captured = await this.#audioSessionFactory().run(
+        options.signal,
+        options.onVoiceActivity
+      );
       if (captured.state !== "COMPLETE") {
         const state = captured.state === "TIMEOUT" ? "NO_SPEECH" : "CANCELLED";
         notify(options.onStateChange, state);

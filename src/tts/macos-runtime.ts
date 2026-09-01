@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { performance } from "node:perf_hooks";
 import { JarvisError } from "../errors.js";
 import type { TTSBackendMetadata } from "./contracts.js";
 import type { TTSRuntimeClient, TTSRuntimeInput, TTSRuntimeResult } from "./runtime.js";
@@ -10,20 +11,28 @@ export interface MacOSSpeechProcessInput {
 }
 
 export interface MacOSSpeechProcessRunner {
-  run(input: MacOSSpeechProcessInput, signal?: AbortSignal): Promise<{ readonly exitCode: number }>;
+  run(
+    input: MacOSSpeechProcessInput,
+    signal?: AbortSignal
+  ): Promise<{ readonly exitCode: number; readonly processStartupLatencyMs?: number }>;
 }
 
 export class SystemSayProcessRunner implements MacOSSpeechProcessRunner {
-  run(input: MacOSSpeechProcessInput, signal?: AbortSignal): Promise<{ readonly exitCode: number }> {
+  run(
+    input: MacOSSpeechProcessInput,
+    signal?: AbortSignal
+  ): Promise<{ readonly exitCode: number; readonly processStartupLatencyMs?: number }> {
     const invocation = macOSSpeechInvocationFor(input);
     if (signal?.aborted === true) {
       return Promise.reject(new DOMException("Speech playback aborted.", "AbortError"));
     }
     return new Promise((resolve, reject) => {
+      const startedAt = performance.now();
       const child = spawn(invocation.executable, invocation.arguments, {
         stdio: "ignore",
         shell: false
       });
+      let processStartupLatencyMs: number | undefined;
       let settled = false;
       const cleanup = () => signal?.removeEventListener("abort", onAbort);
       const onAbort = () => {
@@ -38,6 +47,9 @@ export class SystemSayProcessRunner implements MacOSSpeechProcessRunner {
         onAbort();
         return;
       }
+      child.once("spawn", () => {
+        processStartupLatencyMs = finiteElapsed(startedAt);
+      });
       child.once("error", () => {
         if (settled) return;
         settled = true;
@@ -48,7 +60,10 @@ export class SystemSayProcessRunner implements MacOSSpeechProcessRunner {
         if (settled) return;
         settled = true;
         cleanup();
-        resolve({ exitCode: code ?? 1 });
+        resolve({
+          exitCode: code ?? 1,
+          ...(processStartupLatencyMs === undefined ? {} : { processStartupLatencyMs })
+        });
       });
     });
   }
@@ -75,13 +90,23 @@ export class MacOSSystemSpeechRuntime implements TTSRuntimeClient {
         signal
       );
       return result.exitCode === 0
-        ? { status: "COMPLETED" }
+        ? {
+            status: "COMPLETED",
+            ...(result.processStartupLatencyMs === undefined
+              ? {}
+              : { processStartupLatencyMs: result.processStartupLatencyMs })
+          }
         : { status: "INVALID", errorCode: "PLAYBACK_FAILED" };
     } catch (error) {
       if (signal?.aborted === true) throw error;
       return { status: "INVALID", errorCode: "PLAYBACK_FAILED" };
     }
   }
+}
+
+function finiteElapsed(startedAt: number): number {
+  const elapsed = performance.now() - startedAt;
+  return Number.isFinite(elapsed) && elapsed >= 0 ? elapsed : 0;
 }
 
 export function macOSSpeechInvocationFor(input: MacOSSpeechProcessInput): {

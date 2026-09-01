@@ -64,6 +64,13 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
     return parseEmbeddingResult(result);
   }
 
+  async warmup(signal?: AbortSignal): Promise<void> {
+    const result = await this.#request("warmup", {}, signal);
+    if (!isRecord(result) || result.status !== "READY" || Object.keys(result).length !== 1) {
+      throw unavailable();
+    }
+  }
+
   async compareEmbeddings(
     reference: Float32Array,
     candidate: Float32Array,
@@ -99,7 +106,7 @@ export class PythonVoiceIDRuntimeClient implements VoiceIDRuntimeClient {
   }
 
   async #request(
-    operation: "extract" | "compare" | "importEnrollment",
+    operation: "extract" | "compare" | "importEnrollment" | "warmup",
     payload: unknown,
     signal?: AbortSignal
   ): Promise<unknown> {

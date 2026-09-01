@@ -16,7 +16,7 @@ export class EnergyVoiceActivityDetector implements VoiceActivityDetector {
 
   constructor(options: EnergyVoiceActivityDetectorOptions = {}) {
     this.#speechThreshold = options.speechThreshold ?? 0.015;
-    this.#endSilenceMilliseconds = options.endSilenceMilliseconds ?? 700;
+    this.#endSilenceMilliseconds = options.endSilenceMilliseconds ?? 500;
     if (
       !Number.isFinite(this.#speechThreshold) ||
       this.#speechThreshold <= 0 ||
@@ -50,7 +50,7 @@ export class EnergyVoiceActivityDetector implements VoiceActivityDetector {
     if (this.#silenceMilliseconds >= this.#endSilenceMilliseconds) {
       return "SPEECH_END";
     }
-    return "SPEECH";
+    return "TRAILING_SILENCE";
   }
 
   reset(): void {

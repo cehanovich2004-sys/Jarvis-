@@ -13,6 +13,7 @@ import { DEFAULT_AUDIO_LIMITS } from "./validation.js";
 export interface AudioSessionOptions {
   readonly timeoutMilliseconds: number;
   readonly cleanupTimeoutMilliseconds?: number;
+  readonly preRollMilliseconds?: number;
   readonly limits?: AudioLimits;
 }
 
@@ -29,7 +30,11 @@ export class AudioSession {
     if (
       !isValidTimeout(options.timeoutMilliseconds) ||
       (options.cleanupTimeoutMilliseconds !== undefined &&
-        !isValidTimeout(options.cleanupTimeoutMilliseconds))
+        !isValidTimeout(options.cleanupTimeoutMilliseconds)) ||
+      (options.preRollMilliseconds !== undefined &&
+        (!Number.isSafeInteger(options.preRollMilliseconds) ||
+          options.preRollMilliseconds < 0 ||
+          options.preRollMilliseconds > 1_000))
     ) {
       throw new JarvisError("AUDIO_INVALID", 422, "Audio session timeout is invalid.");
     }
@@ -42,12 +47,16 @@ export class AudioSession {
     return this.#state;
   }
 
-  async run(signal?: AbortSignal): Promise<AudioSessionResult> {
+  async run(
+    signal?: AbortSignal,
+    onVoiceActivity?: (activity: VoiceActivity) => void
+  ): Promise<AudioSessionResult> {
     if (this.#hasRun) {
       throw new JarvisError("AUDIO_INVALID", 409, "Audio session has already run.");
     }
     this.#hasRun = true;
     const buffer = new BoundedAudioBuffer(this.#options.limits ?? DEFAULT_AUDIO_LIMITS);
+    const preRoll = new AudioPreRoll(this.#options.preRollMilliseconds ?? 0);
     const controller = new AbortController();
     const forwardAbort = (): void => controller.abort();
     signal?.addEventListener("abort", forwardAbort, { once: true });
@@ -87,7 +96,8 @@ export class AudioSession {
           throw activityResult.error;
         }
         const activity = activityResult.value;
-        this.#handleActivity(activity, next.result.value, buffer);
+        notifyActivity(onVoiceActivity, activity);
+        this.#handleActivity(activity, next.result.value, buffer, preRoll);
         if (activity === "SPEECH_END") {
           this.#state = "COMPLETE";
           return { state: "COMPLETE", audio: buffer.snapshot() };
@@ -110,6 +120,7 @@ export class AudioSession {
       signal?.removeEventListener("abort", forwardAbort);
       controller.abort();
       buffer.clear();
+      preRoll.clear();
       let cleanupFailed = false;
       try {
         this.#vad.reset();
@@ -137,14 +148,24 @@ export class AudioSession {
   #handleActivity(
     activity: VoiceActivity,
     chunk: Parameters<BoundedAudioBuffer["append"]>[0],
-    buffer: BoundedAudioBuffer
+    buffer: BoundedAudioBuffer,
+    preRoll: AudioPreRoll
   ): void {
+    if (activity === "SILENCE") {
+      preRoll.append(chunk);
+      return;
+    }
     if (activity === "SPEECH_START") {
       this.#state = "SPEECH";
+      for (const buffered of preRoll.drain()) buffer.append(buffered);
       buffer.append(chunk);
       return;
     }
-    if (activity === "SPEECH" || activity === "SPEECH_END") {
+    if (
+      activity === "SPEECH" ||
+      activity === "TRAILING_SILENCE" ||
+      activity === "SPEECH_END"
+    ) {
       if (this.#state !== "SPEECH") {
         throw new JarvisError("AUDIO_INVALID", 422, "Voice activity transition is invalid.");
       }
@@ -155,6 +176,56 @@ export class AudioSession {
   #incompleteResult(state: "TIMEOUT" | "CANCELLED"): AudioSessionResult {
     this.#state = state;
     return { state, audio: null };
+  }
+}
+
+class AudioPreRoll {
+  readonly #maximumMilliseconds: number;
+  readonly #chunks: import("./contracts.js").AudioChunk[] = [];
+  #durationMilliseconds = 0;
+
+  constructor(maximumMilliseconds: number) {
+    this.#maximumMilliseconds = maximumMilliseconds;
+  }
+
+  append(chunk: import("./contracts.js").AudioChunk): void {
+    if (this.#maximumMilliseconds === 0) return;
+    const snapshot = { ...chunk, samples: chunk.samples.slice() };
+    this.#chunks.push(snapshot);
+    this.#durationMilliseconds += durationMilliseconds(snapshot);
+    while (
+      this.#chunks.length > 0 &&
+      this.#durationMilliseconds > this.#maximumMilliseconds
+    ) {
+      const removed = this.#chunks.shift();
+      if (removed !== undefined) this.#durationMilliseconds -= durationMilliseconds(removed);
+    }
+  }
+
+  drain(): readonly import("./contracts.js").AudioChunk[] {
+    const chunks = this.#chunks.splice(0);
+    this.#durationMilliseconds = 0;
+    return chunks;
+  }
+
+  clear(): void {
+    this.#chunks.length = 0;
+    this.#durationMilliseconds = 0;
+  }
+}
+
+function durationMilliseconds(chunk: import("./contracts.js").AudioChunk): number {
+  return chunk.samples.length / chunk.sampleRate * 1_000;
+}
+
+function notifyActivity(
+  observer: ((activity: VoiceActivity) => void) | undefined,
+  activity: VoiceActivity
+): void {
+  try {
+    observer?.(activity);
+  } catch {
+    // Operational diagnostics cannot alter capture behavior.
   }
 }
 
